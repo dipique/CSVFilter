@@ -1,0 +1,16 @@
+﻿<Window x:Class="CSVFilter.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:CSVFilter"
+        mc:Ignorable="d"
+        Title="CSV Sanitizer" Height="406.776" Width="922.727">
+    <Grid x:Name="grdFiles" DragOver="grdFiles_DragOver" AllowDrop="True" Background="Transparent" DragLeave="grdFiles_DragLeave" Drop="grdFiles_Drop" >
+        <Label Name="lblFilenames"></Label>
+        <Label HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" Foreground="Gray" FontSize="18">Drop files here</Label>
+        <Button FontSize="18" FontWeight="Bold" Name="btnProcess" HorizontalAlignment="Right" Width="100" IsEnabled="False" Click="btnProcess_Click">
+            Sanitize
+        </Button>
+    </Grid>
+</Window>
