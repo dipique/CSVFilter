@@ -86,24 +86,26 @@ namespace CSVFilter
 
         private FileSanitizer GetWellnessCSVFileSanitizer()
         {
+            string disallowed = "*+`~!#$%^&*()={}[]|:;<>?";
+            string[] allowedPayPeriods = new[] { "12", "24", "26", "52" };
             return new FileSanitizer(new[] {
-                new FieldDefinition("GroupId", false, true, string.Empty, FieldDefinition.NUMERIC),
-                new FieldDefinition("CompanyDivLocID"),
-                new FieldDefinition("CompanyDepartment"),
-                new FieldDefinition("StartDate", new DateCheck()),
-                new FieldDefinition("EmployeeEmailAddress", email_regex),
-                new FieldDefinition("LastName", false, true, string.Empty, FieldDefinition.NAMECHARS),
-                new FieldDefinition("FirstName", false, true, string.Empty, FieldDefinition.NAMECHARS),
-                new FieldDefinition("MiddleName", true, true, string.Empty, FieldDefinition.NAMECHARS),
-                new FieldDefinition("DateOfBirth", new DateCheck()),
-                new FieldDefinition("Address1", true, true, string.Empty, string.Empty),
-                new FieldDefinition("Address2", true, true, string.Empty, string.Empty),
-                new FieldDefinition("City", true, true, string.Empty, string.Empty),
-                new FieldDefinition("State", true, true, string.Empty, string.Empty),
-                new FieldDefinition("Zip", true, true, string.Empty, string.Empty),
-                new FieldDefinition("HomePhone", true, true, string.Empty, FieldDefinition.NUMERIC, 10,10),
+                new FieldDefinition("GroupId", false, allowedChars: FieldDefinition.NUMERIC),
+                new FieldDefinition("CompanyDivLocID", allowedChars: FieldDefinition.ALPHA),
+                new FieldDefinition("CompanyDepartment", allowedChars: FieldDefinition.ALPHA),
+                new FieldDefinition("StartDate", false, check: new DateCheck()),
+                new FieldDefinition("EmployeeEmailAddress", false, regex: email_regex),
+                new FieldDefinition("LastName", false, allowedChars: FieldDefinition.NAMECHARS),
+                new FieldDefinition("FirstName", false, allowedChars: FieldDefinition.NAMECHARS),
+                new FieldDefinition("MiddleName", allowedChars: FieldDefinition.NAMECHARS),
+                new FieldDefinition("DateOfBirth", false, check: new DateCheck()),
+                new FieldDefinition("Address1", false, allowedChars: FieldDefinition.ALPHANUMERIC),
+                new FieldDefinition("Address2", allowedChars: FieldDefinition.ALPHANUMERIC),
+                new FieldDefinition("City", false, allowedChars: FieldDefinition.ALPHA),
+                new FieldDefinition("State", false, allowedChars: FieldDefinition.ALPHA),
+                new FieldDefinition("Zip", false, minLength:5, maxLength:9, allowedChars: FieldDefinition.NUMERIC),
+                new FieldDefinition("HomePhone", false, true, string.Empty, FieldDefinition.NUMERIC, 10,10),
                 new FieldDefinition("WorkPhone", true, true, string.Empty, FieldDefinition.NUMERIC, 10,10),
-                new FieldDefinition("SSN", true, true, string.Empty, string.Empty),
+                new FieldDefinition("SSN", false, true, string.Empty, FieldDefinition.NUMERIC, 9,9),
                 new FieldDefinition("EducationMajor", true, true, string.Empty, string.Empty),
                 new FieldDefinition("Occupation", true, true, string.Empty, string.Empty),
                 new FieldDefinition("BenefitDollars", true, true, string.Empty, FieldDefinition.DECIMAL),
@@ -115,8 +117,8 @@ namespace CSVFilter
                 new FieldDefinition("LifeInsurancePremium", true, true, string.Empty, string.Empty),
                 new FieldDefinition("LifeInsuranceFaceValue", true, true, string.Empty, string.Empty),
                 new FieldDefinition("UserGender", new GenderCheck()),
-                new FieldDefinition("PayrollFrequency", true, true, string.Empty, string.Empty)
-            }, ",");
+                new FieldDefinition("PayrollFrequency", true, allowedChars: FieldDefinition.NUMERIC, allowedValues: allowedPayPeriods)
+            }, ",", disallowed.ToCharArray());
         }
     }
 }

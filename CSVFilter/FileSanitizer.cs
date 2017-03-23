@@ -16,6 +16,7 @@ namespace CSVFilter
         [ResetField] public string Filename { get; set; } = string.Empty;
         public string Error_Filename => $"{Output_Filename}{ERROR_SUFFIX}";
         public string Output_Filename => $"{OUTPUT_DIR}\\{Filename}";
+        private char[] globalDisallowed { get; set; }
 
         //definitions
         public FieldDefinition[] FieldDefinitions { get; set; }
@@ -37,8 +38,9 @@ namespace CSVFilter
         const string HDR_STRIP_CHARS = "\"1234567890/\\@;";
 
 
-        public FileSanitizer(FieldDefinition[] fields, string delim, bool removeEmptyEntries = true, bool? hasHeader = null)
-        {            
+        public FileSanitizer(FieldDefinition[] fields, string delim, char[] disallowedChars, bool removeEmptyEntries = true, bool? hasHeader = null)
+        {
+            globalDisallowed = disallowedChars;
             FieldDefinitions = fields;
             delimiter = new[] { delim };
             RemoveEmptyEntries = removeEmptyEntries;
@@ -95,7 +97,7 @@ namespace CSVFilter
             int lineCount = dataLines.Count();
             if (lineCount == 0) return;
             
-            DataRows = Enumerable.Range(0, lineCount - 1).Select(ind => new Row(dataLines[ind], delimiter, FieldCount, ind)).ToArray();
+            DataRows = Enumerable.Range(0, lineCount - 1).Select(ind => new Row(dataLines[ind], delimiter, FieldCount, ind, globalDisallowed)).ToArray();
 
             //Add any extra data rows found, if applicable
             DataRows = DataRows.Concat(DataRows.SelectMany(r => r.ExtraRows)).ToArray();
@@ -163,24 +165,26 @@ namespace CSVFilter
         public int MaxLength { get; set; } = int.MaxValue;
         public int MinLength { get; set; } = 0;
         public string RegEx { get; set; } = string.Empty;
+        public string[] AllowedValues { get; set; } = null; //limit values to a certain set of options
 
         /// <summary>
         /// Only used if AllowedBlank=false
         /// </summary>
         public string ValueIfBlank { get; set; } = "ERROR: Missing required value.";
         public string ValueIfWrongLength { get; set; } = "ERROR: Invalid length.";
+        public string ValueIfNotInAllowedOptions { get; set; } = "ERROR: Not a valid selection from the list of options.";
 
         public List<CustomCheck> CustomChecks = new List<CustomCheck>();
 
         //for convenience, some standard character sets
-        public const string ALPHA = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        public const string ALPHA = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ";
         public const string NUMERIC = "1234567980";
         public const string DECIMAL = "1234567980.";
         public const string SYMBOLS = "/*-+`~!@#$%^&*()_+=-{}[]\\|:;<>,./?\"";
-        public static string NAMECHARS => ALPHA + "-. ";
+        public static string NAMECHARS => ALPHA + ". ";
         public static string ALPHANUMERIC => ALPHA + NUMERIC;
 
-        public FieldDefinition(string name, bool allowedBlank = true, bool trimField = true, string disallowedChars = "", string allowedChars = "", int minLength = 0, int maxLength = int.MaxValue, List<CustomCheck> checks = null)
+        public FieldDefinition(string name, bool allowedBlank = true, bool trimField = true, string disallowedChars = "", string allowedChars = "", int minLength = 0, int maxLength = int.MaxValue, CustomCheck check = null, string regex = null, string[] allowedValues = null)
         {
             Name = name;
             AllowedBlank = allowedBlank;
@@ -189,7 +193,10 @@ namespace CSVFilter
             MinLength = minLength;
             DisallowedCharacters = disallowedChars;
             AllowedCharacters = allowedChars;
-            CustomChecks = checks ?? new List<CustomCheck>();
+            CustomChecks = new List<CustomCheck>();
+            if (check != null) CustomChecks.Add(check);
+            if (!string.IsNullOrWhiteSpace(regex)) RegEx = regex;
+            AllowedValues = allowedValues;
         }
 
         public FieldDefinition(string name)
@@ -223,10 +230,8 @@ namespace CSVFilter
                 return;
             }
 
-            //Trim and check for blanks
-            var chars = sanitizedValue.ToCharArray();
-
             //Removes any disallowed characters and retains only allowed characters
+            var chars = sanitizedValue.ToCharArray();
             if (AllowedCharacters.Any())
                 chars = chars.Where(c => AllowedCharacters.Any(a => a == c)).ToArray();
             if (DisallowedCharacters.Any())
@@ -250,8 +255,26 @@ namespace CSVFilter
             }
 
             //run any custom checks
-            value.SanitizedValue = sanitizedValue;
+            value.SanitizedValue = RemoveDoubleSpaces(sanitizedValue); //remove any double spaces
             CustomChecks.ForEach(c => c.Execute(value));
+
+            //If this there are a fixed number of options, check for them
+            if ((AllowedValues?.Count() ?? 0) != 0 &&
+                !AllowedValues.Any(v => v == value.SanitizedValue))
+            {
+                value.ErrorMsg = ValueIfNotInAllowedOptions;
+            }
+        }
+
+        private static string RemoveDoubleSpaces(string value)
+        {
+            string retVal = value;
+            string dbl = "  ";
+            while (retVal.Contains(dbl))
+            {
+                retVal = retVal.Replace(dbl, " ");
+            }
+            return retVal;
         }
     }
     public class Value
@@ -277,12 +300,21 @@ namespace CSVFilter
         public int Position { get; set; }
         public string ToRowString(string delim) => string.Join(delim, Values.Select(v => v.SanitizedValue));
 
-        public Row(string contents, string[] delim, int correctColCount, int position)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="contents"></param>
+        /// <param name="delim"></param>
+        /// <param name="correctColCount"></param>
+        /// <param name="position"></param>
+        /// <param name="disallowedChars">A list of disallowed characters to remove in addition to 
+        /// those specified by the field. This is for support of globally disallowed characters.</param>
+        public Row(string contents, string[] delim, int correctColCount, int position, char[] disallowedChars)
         {
             Position = position;
 
             //immediately get rid of any characters that are never ever legal
-            OriginalText = PreSanitize(contents);
+            OriginalText = PreSanitize(contents, disallowedChars);
             var stringVals = OriginalText.Split(delim, StringSplitOptions.None);
             HasCorrectColCount = correctColCount == stringVals.Count();
 
@@ -299,7 +331,7 @@ namespace CSVFilter
             if (tmp % (correctColCount - 1) == 0)
             {
                 var allRows = SeparateCombinedRows(stringVals, correctColCount, delim);
-                ExtraRows.AddRange(allRows.Skip(1).Select(r => new Row(string.Join(delim[0], r), delim, correctColCount, Position)));
+                ExtraRows.AddRange(allRows.Skip(1).Select(r => new Row(string.Join(delim[0], r), delim, correctColCount, Position, disallowedChars)));
 
                 //set the parameters of this row
                 OriginalText = string.Join(delim[0], allRows[0]);
@@ -403,7 +435,7 @@ namespace CSVFilter
         }
 
         //get the text ready for analysis by removing certain characters and ensuring that there aren't quote-respecting sections
-        private string PreSanitize(string value)
+        private string PreSanitize(string value, char[] disallowedChars)
         {
             string retVal = value;
             if (retVal.Length == 0) return string.Empty;
@@ -416,10 +448,8 @@ namespace CSVFilter
                 char c = retVal[x];
                 switch (c)
                 {
-                    case '\r':   //These are the characters that are NEVER legal
-                    case '\t':   //if more are added we should really add these to a constant
-                    case '#':    //rather than case-ing them one by one
-                        break;
+                    case '\r':   //These are the characters that are NEVER legal and cause issues
+                    case '\t':   
                     case '\"':   //toggle inside/outside quotes
                         insideQuotes = !insideQuotes;
                         break;
@@ -435,7 +465,9 @@ namespace CSVFilter
                 }
             }
 
-            return new string(chars.ToArray());
+            //remove any globally disallowed characters
+            return new string(chars.Where(c => !disallowedChars.Any(d => c == d))
+                                   .ToArray());
         }        
     }
 
