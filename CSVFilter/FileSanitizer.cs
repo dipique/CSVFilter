@@ -31,7 +31,7 @@ namespace CSVFilter
         public bool HasErrors => DataRows.Any(d => !d.AllValidValues);
 
         //constants
-        const string ERROR_SUFFIX = "_ERROR.TXT";
+        const string ERROR_SUFFIX = "_ERROR.csv";
         const decimal HEADER_SIZE_CHANGE = .85m;
         string ERROR_HDR_ROW => $"Line{delimiter[0]}Field{delimiter[0]}Value{delimiter[0]}Error";
         public const string OUTPUT_DIR = "OUTPUT";
@@ -53,23 +53,6 @@ namespace CSVFilter
             var data = File.ReadAllLines(inputFile.FullName);
             ParseContents(data);                    
         }
-
-        ///// <summary>
-        ///// 
-        ///// </summary>
-        ///// <param name="inputFile">Contents of the file separated by line breaks</param>
-        //public void LoadFile(string filename, string inputFile)
-        //{
-        //    Filename = filename;
-        //    var data = inputFile.Split('\n').Select(s => s.Trim()).ToArray();
-        //    ParseContents(data);
-        //}
-
-        //public void LoadFile(string filename, string[] inputFile)
-        //{
-        //    Filename = filename;
-        //    ParseContents(inputFile);
-        //}
 
         public void ParseContents(string[] data)
         {
@@ -96,8 +79,12 @@ namespace CSVFilter
 
             int lineCount = dataLines.Count();
             if (lineCount == 0) return;
+
+            //get adder for position of row in file
+            int adder = 1;
+            if (HeaderRow != null) adder++;
             
-            DataRows = Enumerable.Range(0, lineCount - 1).Select(ind => new Row(dataLines[ind], delimiter, FieldCount, ind, globalDisallowed)).ToArray();
+            DataRows = Enumerable.Range(0, lineCount).Select(ind => new Row(dataLines[ind], delimiter, FieldCount, ind + adder, globalDisallowed)).ToArray();
 
             //Add any extra data rows found, if applicable
             DataRows = DataRows.Concat(DataRows.SelectMany(r => r.ExtraRows)).ToArray();
@@ -346,7 +333,7 @@ namespace CSVFilter
 
         private Value[] GetValues(string[] vals, int correctColCount)
         {
-            var retVal = Enumerable.Range(0, vals.Count() - 1).Select(f => new Value() {
+            var retVal = Enumerable.Range(0, vals.Count()).Select(f => new Value() {
                 FieldIndex = f,
                 OriginalValue = vals[f]
             }).ToArray();
@@ -354,7 +341,7 @@ namespace CSVFilter
             //Add "missing" values if needed
             if (!HasCorrectColCount)
             {
-                retVal = retVal.Concat(Enumerable.Range(vals.Count(), correctColCount - 1)
+                retVal = retVal.Concat(Enumerable.Range(vals.Count(), correctColCount)
                                                  .Select(f => new Value() {
                                                      FieldIndex = f,
                                                      Missing = true
