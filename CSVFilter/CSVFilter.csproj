@@ -54,6 +54,8 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="ResetFieldAttribute.cs" />
+    <Compile Include="Row.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -63,6 +65,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="CustomChecks.cs" />
+    <Compile Include="FieldDefinition.cs" />
     <Compile Include="FileSanitizer.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
